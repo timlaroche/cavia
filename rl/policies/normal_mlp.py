@@ -77,11 +77,9 @@ class CaviaMLPPolicy(Policy, nn.Module):
 
         layer_sizes = (input_size,) + hidden_sizes
 
-        self.add_module('layer{0}'.format(1), nn.Linear(layer_sizes[0] + num_context_params, layer_sizes[1]))
-        self.add_module('nm_layer{0}'.format(1), layers.NMLinear(layer_sizes[1], layer_sizes[1]))
+        self.add_module('nm_layer{0}'.format(1), layers.NMLinear(layer_sizes[0] + num_context_params, layer_sizes[1]))        
         for i in range(2, self.num_layers):
-            self.add_module('layer{0}'.format(i), nn.Linear(layer_sizes[i - 1], layer_sizes[i]))
-            self.add_module('nm_layer{0}'.format(i), layers.NMLinear(layer_sizes[i], layer_sizes[i]))
+            self.add_module('nm_layer{0}'.format(i), layers.NMLinear(layer_sizes[i - 1], layer_sizes[i]))
 
         self.num_context_params = num_context_params
         self.context_params = torch.zeros(self.num_context_params, requires_grad=True).to(self.device)
@@ -97,26 +95,24 @@ class CaviaMLPPolicy(Policy, nn.Module):
         if params is None:
             params = OrderedDict(self.named_parameters())
 
-
-        # TODO: There must be a better way of doing this instead of getting each layer every loop
-        #       We just want to access the nm_layers to send it through
-        layers = OrderedDict()
-        for name, module in self.named_modules():
-            layers[name] = module
-
         # concatenate context parameters to input
         output = torch.cat((input, self.context_params.expand(input.shape[:-1] + self.context_params.shape)),
                            dim=len(input.shape) - 1)
 
-        # forward through FC Layer
+        # forward through NM Layers
         for i in range(1, self.num_layers):
-            output = F.linear(output, weight=params['layer{0}.weight'.format(i)],
-                              bias=params['layer{0}.bias'.format(i)])
-            output = self.nonlinearity(output)
+            # ====== NMLinear Forward begin =======
+            # Essentially the forward function of the NM linear layers
+            y = F.linear(output, weight=params['nm_layer{0}.wm.weight'.format(i)], bias=params['nm_layer{0}.wm.bias'.format(i)])
+            y = self.nonlinearity(y)
 
-            # forward through NeuroModulator layers
-            nm_layer = layers["nm_layer{0}".format(i)]
-            output = nm_layer(output)
+            y_prime = F.linear(y, weight=params['nm_layer{0}.wn.weight'.format(i)], bias=params['nm_layer{0}.wn.bias'.format(i)])
+            y_prime = y_prime.tanh()
+
+            z = F.linear(output, weight=params['nm_layer{0}.ws.weight'.format(i)], bias=params['nm_layer{0}.ws.bias'.format(i)])
+
+            output = self.nonlinearity(z * y_prime)
+            # ====== NMLinear Forward end =======
 
         # last layer outputs mean; scale is a learned param independent of the input
         mu = F.linear(output, weight=params['mu.weight'], bias=params['mu.bias'])
