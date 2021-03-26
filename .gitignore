@@ -14,7 +14,6 @@ data/CelebA/
 
 # result folders
 saves/
-logs/
 plots/
 results/
 *result_plots
