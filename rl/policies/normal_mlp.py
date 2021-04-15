@@ -109,9 +109,12 @@ class CaviaMLPPolicy(Policy, nn.Module):
             y_prime = F.linear(y, weight=params['nm_layer{0}.wn.weight'.format(i)], bias=params['nm_layer{0}.wn.bias'.format(i)])
             y_prime = y_prime.tanh()
 
+            y_prime_updated_sign = torch.sign(y_prime)
+            y_prime_updated_sign[y_prime_updated_sign == 0.] = 1. # 0 values have sign 1 rather than 0
+
             z = F.linear(output, weight=params['nm_layer{0}.ws.weight'.format(i)], bias=params['nm_layer{0}.ws.bias'.format(i)])
 
-            output = self.nonlinearity(z * y_prime)
+            output = self.nonlinearity(z * y_prime_updated_sign)
             # ====== NMLinear Forward end =======
 
         # last layer outputs mean; scale is a learned param independent of the input

@@ -12,8 +12,10 @@ class NMLinear(nn.Module):
 	def forward(self, input):
 		y = F.relu(self.wm(input))
 		y_prime = self.wn(y).tanh() # F.tanh is deprecated, source code for F.tanh(input) just calls input.tanh
+		y_prime_updated_sign = torch.sign(y_prime)
+        y_prime_updated_sign[y_prime_updated_sign == 0.] = 1. # 0 values have sign 1 rather than 0
 
 		z = self.ws(input)
 
-		output = F.relu(z * y_prime)
+		output = F.relu(z * y_prime_updated_sign)
 		return output
