@@ -79,7 +79,7 @@ def parse_args():
 
     # use the GPU if available
     args.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    println("Using" + str(args.device))
+    print("Using" + str(args.device))
 
     args.output_folder = 'maml' if args.maml else 'cavia'
 
